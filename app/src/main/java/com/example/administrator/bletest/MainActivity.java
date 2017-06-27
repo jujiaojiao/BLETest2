@@ -167,11 +167,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     //发送数据
     private void sendData() {
         // 蓝牙服务端发送简单的一个字符串：hello,world!给连接的客户
-        String s = "hello world";
+        String s = "helloWorld";
         byte[] buffer = s.getBytes();
         try {
             OutputStream os = socket.getOutputStream();
             Log.d("JJJ=====", "服务器端数据发送完毕!"+s);
+//            os.write(i);
             os.write(buffer);
             os.flush();
             } catch (Exception e) {
