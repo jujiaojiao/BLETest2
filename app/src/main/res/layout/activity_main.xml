@@ -14,18 +14,6 @@
         android:text="搜索设备"
         android:onClick="OnClick"
         />
-    <Button
-        android:id="@+id/send"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="连接成功后点击发送数据"
-        android:onClick="OnClick"
-        />
-    <TextView
-        android:id="@+id/tv1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="已连接设备："/>
     <TextView
         android:id="@+id/connect"
         android:textSize="20sp"

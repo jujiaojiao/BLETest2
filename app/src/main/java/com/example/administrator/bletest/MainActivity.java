@@ -54,11 +54,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private  BluetoothReceiver blueRe;//蓝牙设备
     private ListAdapter adapter;//填充数据
     private ListView listview;
-    private BluetoothGattService service;
-    private BluetoothGatt bluetoothGatt;
     private BluetoothSocket socket;
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -70,12 +66,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void initView(){
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         Button scan = ((Button) findViewById(R.id.btn));
-        Button send = ((Button) findViewById(R.id.send));
         listview = ((ListView) findViewById(R.id.listview));
         list = new ArrayList<>();
         name = new ArrayList<>();
         scan.setOnClickListener(this);
-        send.setOnClickListener(this);
         //注册蓝牙监听广播
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BluetoothDevice.ACTION_FOUND);
@@ -88,8 +82,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         switch (v.getId()) {
             case R.id.btn:
                 scanDevice();
-                break;
-            case R.id.send:
                 break;
         }
     }
@@ -110,6 +102,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             return true;
         }
     }
+    //扫描设备
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
     private void scanDevice(){
         if (mBluetoothAdapter.isEnabled()){
@@ -124,6 +117,83 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }else {
             //不可见，直接停止扫描
             mBluetoothAdapter.cancelDiscovery();
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+        if (mBluetoothAdapter.isDiscovering()){
+            mBluetoothAdapter.cancelDiscovery();
+        }
+        //判断是否已匹配，若匹配则连接，如未匹配则先匹配再连接
+        final BluetoothDevice remoteDevice = mBluetoothAdapter.getRemoteDevice(list.get(position).getAddress());
+        if (remoteDevice.getBondState()==BluetoothDevice.BOND_BONDED){
+            connect(remoteDevice);
+        }else{
+            Method createBond = null;
+            try {
+                createBond = remoteDevice.getClass().getMethod("createBond");
+                boolean isok = (boolean) createBond.invoke(remoteDevice);
+                if (isok){
+                    connect(remoteDevice);
+                }
+            } catch (NoSuchMethodException e) {
+                e.printStackTrace();
+            } catch (InvocationTargetException e) {
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    //蓝牙连接
+    private void connect( final BluetoothDevice remoteDevice){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    socket = remoteDevice.createRfcommSocketToServiceRecord(MY_UUID);
+                    socket.connect();
+                    if (socket.isConnected()){
+                        sendData();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).run();
+    }
+    //发送数据
+    private void sendData() {
+        // 蓝牙服务端发送简单的一个字符串：hello,world!给连接的客户
+        String s = "hello world";
+        byte[] buffer = s.getBytes();
+        try {
+            OutputStream os = socket.getOutputStream();
+            Log.d("JJJ=====", "服务器端数据发送完毕!"+s);
+            os.write(buffer);
+            os.flush();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+    }
+    //蓝牙搜索结果
+    class BluetoothReceiver extends BroadcastReceiver {
+        @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(BluetoothDevice.ACTION_FOUND)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                Log.e("JJJ=======", "str========: "+device.getName());
+                if (!name.contains(device.getAddress())&&device.getName()!=null){
+                    list.add(device);
+                    name.add(device.getAddress());
+                }
+                adapter = new ListAdapter(list,context);
+                listview.setAdapter(adapter);
+                listview.setOnItemClickListener(MainActivity.this);
+            }
         }
     }
     @Override
@@ -168,68 +238,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
     }
-
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
-    @Override
-    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-        final BluetoothDevice remoteDevice = mBluetoothAdapter.getRemoteDevice(list.get(position).getAddress());
-        if (remoteDevice.getBondState()==BluetoothDevice.BOND_BONDED){
-           new Thread(new Runnable() {
-               @Override
-               public void run() {
-                   try {
-                       socket = remoteDevice.createRfcommSocketToServiceRecord(MY_UUID);
-                       socket.connect();
-                       if (socket.isConnected()){
-                           sendData();
-                       }
-                   } catch (IOException e) {
-                       e.printStackTrace();
-                   }
-               }
-           }).run();
-        }else{
-          new Thread(new Runnable() {
-              @Override
-              public void run() {
-                  Method createBond = null;
-                  try {
-                      createBond = remoteDevice.getClass().getMethod("createBond");
-                      boolean isok = (boolean) createBond.invoke(remoteDevice);
-                      if (isok){
-                          socket = remoteDevice.createRfcommSocketToServiceRecord(MY_UUID);
-                          socket.connect();
-                          if (socket.isConnected()){
-                              sendData();
-                          }
-                      }
-                  } catch (NoSuchMethodException e) {
-                      e.printStackTrace();
-                  } catch (InvocationTargetException e) {
-                      e.printStackTrace();
-                  } catch (IllegalAccessException e) {
-                      e.printStackTrace();
-                  } catch (IOException e) {
-                      e.printStackTrace();
-                  }
-              }
-          }).run();
-        }
-    }
-
-    private void sendData() {
-        // 蓝牙服务端发送简单的一个字符串：hello,world!给连接的客户
-        String s = "hello,world ! by zhangphil";
-        byte[] buffer = s.getBytes();
-        try {
-            OutputStream os = socket.getOutputStream();
-            Log.d("JJJ=====", "服务器端数据发送完毕!"+s);
-            os.write(buffer);
-            os.flush();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-    }
+    //释放资源
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -237,22 +246,5 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             mBluetoothAdapter.cancelDiscovery();
         }
         this.unregisterReceiver(blueRe);
-    }
-    class BluetoothReceiver extends BroadcastReceiver {
-        @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(BluetoothDevice.ACTION_FOUND)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                Log.e("JJJ=======", "str========: "+device.getName());
-                if (!name.contains(device.getAddress())&&device.getAddress()!=null){
-                    list.add(device);
-                    name.add(device.getAddress());
-                }
-                adapter = new ListAdapter(list,context);
-                listview.setAdapter(adapter);
-                listview.setOnItemClickListener(MainActivity.this);
-            }
-        }
     }
 }
